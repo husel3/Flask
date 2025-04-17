@@ -1,124 +1,26 @@
-import uuid
+import uuid #to generate unique IDs
 
+#to create the web app and request to handle incoming HTTP request data.
 from flask import Flask, request
+from flask_smorest import Api
 
-from flask_smorest import abort
+# importing blueprints for books and libraries
+from resources.book import blp as BookBlueprint
+from resources.library import blp as LibraryBlueprint
 
-from db import items, stores
+app = Flask(__name__) #to create the Flask app instance
 
-from store import blp as StoreBlueprint
+#to check directly from web
+app.config["PROPAGATE_EXCEPTIONS"] = True
+app.config["API_TITLE"] = "Libraries REST API"
+app.config["API_VERSION"] = "v1"
+app.config["OPENAPI_VERSION"] = "3.1.0"
+app.config["OPENAPI_URL_PREFIX"] = "/"
+app.config["OPENAPI_SWAGGER_UI_PATH"] = "/swagger-ui"
+app.config["OPENAPI_SWAGGER_UI_URL"] = "https://cdn.jsdelivr.net/npm/swagger-ui-dist/"
 
-app = Flask(__name__)
+api = Api(app) #to create an API object
 
-@app.get("/")
-def get_home():
-    return "Hello, Flask!"
-
-
-@app.get("/store")
-def get_stores():
-    return {"stores": list(stores.values())}
-
-
-@app.get("/store/<string:store_id>")
-def get_store(store_id):
-    print(store_id)
-    try:
-        return stores[store_id]
-    except KeyError:
-        abort(404, message='Store not found')
-
-
-@app.post("/store")
-def create_store():
-    store_data = request.get_json()
-    if 'name' not in store_data:
-        abort(404, message='Bad request. Ensure "name" is included')
-
-    for store in stores.values():
-        if store_data['name'] == store['name']:
-            abort(404, message=f"Item {store_data['name']} already exists.")
-
-    store_id = uuid.uuid4().hex
-    new_store = {**store_data, "id": store_id}
-    stores[store_id] = new_store
-
-    return new_store, 201
-
-@app.delete('/delete/<string:store_id>')
-def delete_store(store_id):
-    try:
-        del stores[store_id]
-        return {'message': 'Store deleted.'}
-    except KeyError:
-        abort(404, message='Store not found')
-
-@app.post("/item")
-def create_item():
-    item_data = request.get_json()
-    if (
-        "store_id" not in item_data
-        or "price" not in item_data
-        or "name" not in item_data
-    ):
-        abort(400, message = "Bad request. Ensure 'store_id', 'price' and 'name' are included.")
-    if item_data["store_id"] not in stores:
-        abort(404, message='Store not found')
-
-    for item in items.values():
-        if (item_data['name'] == item['name']
-            and item_data['store_id'] == item['store_id']):
-            abort(404, message=f"Item {item_data['name']} already exists.")
-    item_id = uuid.uuid4().hex
-    new_item = {**item_data, "id": item_id}
-    items[item_id] = new_item
-
-    return new_item, 201
-
-@app.delete('/delete/<string:item_id>')
-def delete_item(item_id):
-    try:
-        del items[item_id]
-        return {'message': 'Item deleted.'}
-    except KeyError:
-        abort(404, message='Item not found')
-
-@app.get("/item")
-def get_all_items():
-    return {"items": list(items.values())}
-
-
-@app.get("/item/<string:item_id>")
-def get_item(item_id):
-    try:
-        return items[item_id]
-    except KeyError:
-        abort(404, message='Item not found')
-
-
-@app.get("/store/<string:store_id>/item")
-def get_item_in_store(store_id):
-    if store_id not in stores:
-        return {"message": "Store not found."}, 404
-    all_items_list = list(items.values())
-    filtered_items_list = [
-        item for item in all_items_list if item["store_id"] == store_id
-    ]
-    return {"items": filtered_items_list}
-
-@app.put('/item/<string:item_id>')
-def update_item(item_id):
-    item_data = request.get_json()
-    if (
-        "store_id" not in item_data
-        or "price" not in item_data
-        or "name" not in item_data
-    ):
-        abort(400, message = "Bad request. Ensure 'store_id', 'price' and 'name' are included.")
-
-    try:
-        item = items[item_id]
-        item |= item_data #combining dictionaries
-        return item
-    except KeyError:
-        abort(404, message = 'Item not found.')
+# register blueprints 
+api.register_blueprint(BookBlueprint)
+api.register_blueprint(LibraryBlueprint)
